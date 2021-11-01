@@ -1,19 +1,19 @@
-# napari-tomoslice
+# napari-subboxer
 
-[![License](https://img.shields.io/pypi/l/napari-tomoslice.svg?color=green)](https://github.com/alisterburt/napari-tomoslice/raw/master/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/napari-tomoslice.svg?color=green)](https://pypi.org/project/napari-tomoslice)
-[![Python Version](https://img.shields.io/pypi/pyversions/napari-tomoslice.svg?color=green)](https://python.org)
-[![tests](https://github.com/alisterburt/napari-tomoslice/workflows/tests/badge.svg)](https://github.com/alisterburt/napari-tomoslice/actions)
-[![codecov](https://codecov.io/gh/alisterburt/napari-tomoslice/branch/master/graph/badge.svg)](https://codecov.io/gh/alisterburt/napari-tomoslice)
+[![License](https://img.shields.io/pypi/l/napari-subboxer.svg?color=green)](https://github.com/alisterburt/napari-subboxer/raw/master/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/napari-subboxer.svg?color=green)](https://pypi.org/project/napari-subboxer)
+[![Python Version](https://img.shields.io/pypi/pyversions/napari-subboxer.svg?color=green)](https://python.org)
+[![tests](https://github.com/alisterburt/napari-subboxer/workflows/tests/badge.svg)](https://github.com/alisterburt/napari-subboxer/actions)
+[![codecov](https://codecov.io/gh/alisterburt/napari-subboxer/branch/master/graph/badge.svg)](https://codecov.io/gh/alisterburt/napari-subboxer)
 
 A napari plugin for visualising and interacting with electron cryotomograms.
 
 
 ## Installation
 
-You can install `napari-tomoslice` via [pip]:
+You can install `napari-subboxer` via [pip]:
 
-    pip install napari-tomoslice
+    pip install napari-subboxer
 
 ## Usage
 
@@ -23,18 +23,15 @@ napari as both volumes and slices through volumes.
 ![demo](https://user-images.githubusercontent.com/7307488/138575305-b05c4735-9c03-4629-bfb0-9612ea8f26fd.gif)
 
 The plugin can be opened from the `plugins` menu in napari, or with 
-`napari-tomoslice` at the command line.
+`napari-subboxer` at the command line.
 
 ![plugins-menu](https://user-images.githubusercontent.com/7307488/138575015-00ea78d9-02c1-44bc-9034-0c0a7fa8d973.png)
 
 ```yaml
-Usage: napari-tomoslice [TOMOGRAM_FILE]
+Usage: napari-subboxer [TOMOGRAM_FILE]
 
-  An interactive tomogram slice viewer in napari.
-
-  Controls: 
-  x/y/z - align normal vector along x/y/z axis 
-  click and drag - shift plane along its normal vector
+  An interactive tool for defining and applying relative transforms
+  on sets of particles in napari.
 
 Arguments:
   [TOMOGRAM_FILE]
@@ -51,7 +48,7 @@ Contributions are very welcome.
 ## License
 
 Distributed under the terms of the [BSD-3] license,
-"napari-tomoslice" is free and open source software
+"napari-subboxer" is free and open source software
 
 ## Issues
 
@@ -68,7 +65,7 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [Mozilla Public License 2.0]: https://www.mozilla.org/media/MPL/2.0/index.txt
 [cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
 
-[file an issue]: https://github.com/alisterburt/napari-tomoslice/issues
+[file an issue]: https://github.com/alisterburt/napari-subboxer/issues
 
 [napari]: https://github.com/napari/napari
 [tox]: https://tox.readthedocs.io/en/latest/
