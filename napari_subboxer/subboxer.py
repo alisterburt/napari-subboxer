@@ -14,21 +14,85 @@ from .plane_controls import shift_plane_along_normal, set_plane_normal_axis, \
 from .points_controls import add_point
 
 
-class RenderingMode(StringEnum):
-    VOLUME = auto()
-    PLANE = auto()
+class SubboxerMode(StringEnum):
+    ADD = auto()
+    DEFINE_Z_AXIS = auto()
+    ROTATE_IN_PLANE = auto()
 
 
 class Subboxer:
     plane_thickness_changed = Signal(float)
-    rendering_mode_changed = Signal(str)
+    mode_changed = Signal(str)
 
     def __init__(self, viewer: napari.Viewer):
         self.viewer = viewer
         self.viewer.dims.ndisplay = 3
+
         self.volume_layer: Optional[napari.layers.Image] = None
         self.plane_layer: Optional[napari.layers.Image] = None
         self.bounding_box_layer: Optional[napari.layers.Points] = None
+        self.transformations_layer: Optional[napari.layers.Points] = None
+
+        self.mode: SubboxerMode = SubboxerMode.ADD
+        self._active_transformation_index: int = 0
+
+    @property
+    def n_transformations(self):
+        if self.transformations_layer is None:
+            return 0
+        return len(self.transformations_layer.data)
+
+    @property
+    def active_transformation_index(self):
+        return self._active_transformation_index
+
+    @active_transformation_index.setter
+    def active_transformation_index(self, value: int):
+        if value > self.n_transformations - 1:
+            value -= self.n_transformations
+        elif value < 0:
+            value = self.n_transformations + value
+        self._active_transformation_index = value
+        self._select_active_transformation()
+        self._center_camera_on_active_transformation()
+
+    def next_transformation(self):
+        self.active_transformation_index += 1
+
+    def previous_transformation(self):
+        self.active_transformation_index -= 1
+
+    @property
+    def _active_transformation_position(self):
+        return self.transformations_layer.data[self.active_transformation_index]
+
+    def _center_camera_on_active_transformation(self):
+        if self.mode in (SubboxerMode.DEFINE_Z_AXIS,
+                         SubboxerMode.ROTATE_IN_PLANE):
+            self.viewer.camera.center = self._active_transformation_position
+
+    def _select_active_transformation(self):
+        self.transformations_layer.selected_data = [
+            self.active_transformation_index
+        ]
+
+    @property
+    def mode(self):
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: SubboxerMode):
+        self._mode = SubboxerMode(value)
+        self.mode_changed.emit(str(self.mode))
+
+    def activate_add_mode(self):
+        self.mode = SubboxerMode.ADD
+
+    def activate_define_z_mode(self):
+        self.mode = SubboxerMode.DEFINE_Z_AXIS
+
+    def activate_rotate_in_plane_mode(self):
+        self.mode = SubboxerMode.ROTATE_IN_PLANE
 
     @property
     def plane_thickness(self):
@@ -68,7 +132,7 @@ class Subboxer:
     def add_volume_layer(self, reconstruction: np.ndarray):
         self.volume_layer = self.viewer.add_image(
             data=reconstruction,
-            name='reconstruction',
+            name='map',
             colormap='gray',
             rendering='mip',
         )
@@ -122,6 +186,7 @@ class Subboxer:
             size=10,
         )
 
+
     def connect_callbacks(self):
         # plane click and drag
         self._shift_plane_callback = partial(
@@ -136,15 +201,10 @@ class Subboxer:
         for key in 'xyz':
             callback = partial(
                 set_plane_normal_axis,
-                layer=self.volume_layer,
+                layer=self.plane_layer,
                 axis=key
             )
             self.viewer.bind_key(key, callback)
-
-
-        self.volume_layer.experimental_slicing_plane.events.thickness.connect(
-            partial(self.plane_thickness_changed.emit, self.plane_thickness)
-        )
 
         # plane orientation(camera)
         self._orient_plane_callback = partial(
@@ -161,6 +221,11 @@ class Subboxer:
             ']', self.increase_plane_thickness
         )
 
+        # plane thickness event emission
+        self.plane_layer.experimental_slicing_plane.events.thickness.connect(
+            partial(self.plane_thickness_changed.emit, self.plane_thickness)
+        )
+
         # add point in points layer on alt-click
         self._add_point_callback = partial(
             add_point,
@@ -170,6 +235,8 @@ class Subboxer:
         self.viewer.mouse_drag_callbacks.append(
             self._add_point_callback
         )
+
+        # add point for defining z-axis
 
     def disconnect_callbacks(self):
         self.viewer.mouse_drag_callbacks.remove(self._shift_plane_callback)

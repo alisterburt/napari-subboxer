@@ -1,5 +1,5 @@
 import numpy as np
-from vispy import app, scene
+from vispy import app, scene, io
 from vispy.visuals.transforms import STTransform
 
 
@@ -8,8 +8,13 @@ canvas_size = (800, 600)
 canvas = scene.SceneCanvas(keys='interactive', size=canvas_size, show=True)
 canvas.measure_fps()
 
+vol1 = np.load(io.load_data_file('volume/stent.npz'))['arr_0']
+
 # Set up a viewbox to display the image with interactive pan/zoom
 view = canvas.central_widget.add_view()
+
+volume1 = scene.visuals.Volume(vol1, parent=view.scene, threshold=0.225)
+volume1.transform = scene.STTransform(translate=(64, 64, 64))
 
 # Create three cameras (Fly, Turntable and Arcball)
 fov = 60.
@@ -30,9 +35,9 @@ def on_mouse_move(event):
     if event.button == 1 and event.is_dragging:
         axis.transform.reset()
 
-        axis.transform.rotate(view.camera.roll, (0, 0, 1))
-        axis.transform.rotate(view.camera.elevation, (1, 0, 0))
-        axis.transform.rotate(view.camera.azimuth, (0, 1, 0))
+        # axis.transform.rotate(view.camera.roll, (0, 0, 1))
+        # axis.transform.rotate(view.camera.elevation, (1, 0, 0))
+        # axis.transform.rotate(view.camera.azimuth, (0, 1, 0))
 
         axis.transform.scale((50, 50, 0.001))
         axis.transform.translate(np.array(canvas_size) / 2)

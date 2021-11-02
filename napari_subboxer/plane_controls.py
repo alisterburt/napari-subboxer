@@ -13,6 +13,10 @@ def shift_plane_along_normal(viewer, event, layer: Optional[napari.layers.Image]
     """Shift a rendered plane along its normal vector.
     This function will shift a plane along its normal vector when the plane is
     clicked and dragged."""
+    # Early exit if alt clicking
+    if 'Alt' in event.modifiers:
+        return
+
     # Calculate intersection of click with plane through data in data coordinates
     intersection = layer.experimental_slicing_plane.intersect_with_line(
         line_position=event.position,

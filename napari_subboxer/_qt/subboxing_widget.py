@@ -1,3 +1,5 @@
+from functools import partial
+
 import napari.viewer
 from napari_plugin_engine import napari_hook_implementation
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QFileDialog
@@ -5,10 +7,11 @@ from qtpy.QtWidgets import QWidget, QVBoxLayout, QFileDialog
 
 from .open_close_buttons import OpenCloseButtonsWidget
 from .named_labeled_slider import NamedLabeledSlider
+from .label_between_arrows import LabelBetweenArrows
 from .selectable_button_list import LabeledSelectableButtonList
 from .utils import enable_with_opacity, disable_with_opacity
 
-from napari_subboxer.subboxer import Subboxer, RenderingMode
+from napari_subboxer.subboxer import Subboxer, SubboxerMode
 
 
 class SubboxingWidget(QWidget):
@@ -16,33 +19,34 @@ class SubboxingWidget(QWidget):
         super().__init__()
         self.viewer = viewer
         self.subboxer = Subboxer(viewer)
-        self.subboxer.plane_thickness_changed.connect(
-            self._on_plane_thickness_changed
-        )
 
         self.open_close_buttons = OpenCloseButtonsWidget(
             open_button=('open map', self._on_tomogram_open),
             close_button=('close map', self._on_tomogram_close)
         )
-
-        self.plane_thickness_controls = NamedLabeledSlider(
-            label='thickness:',
-            minimum_value=1,
-            maximum_value=50,
-            default_value=5
+        self.active_transformation_controls = LabelBetweenArrows(
+            label_func=self.generate_label,
+            decrease_callback=self.subboxer.previous_transformation,
+            increase_callback=self.subboxer.next_transformation,
         )
-        self.plane_thickness_controls.slider.valueChanged.connect(
-            self._on_thickness_slider_changed
+        self.mode_controls = LabeledSelectableButtonList(
+            label='mode:',
+            button_data=[
+                ('add point', self.subboxer.activate_add_mode),
+                ('set z axis', self.subboxer.activate_define_z_mode),
+                ('in plane', self.subboxer.activate_rotate_in_plane_mode)
+            ]
         )
 
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(self.open_close_buttons)
-        self.layout().addWidget(self.plane_thickness_controls)
+        self.layout().addWidget(self.mode_controls)
+        self.layout().addWidget(self.active_transformation_controls)
         self.layout().setSpacing(0)
         self.layout().setContentsMargins(8, 2, 2, 2)
         self.layout().addStretch(1)
 
-        self.setFixedHeight(90)
+        # self.setFixedHeight(90)
 
     def _on_tomogram_open(self):
         options = QFileDialog.Options()
@@ -58,27 +62,14 @@ class SubboxingWidget(QWidget):
             return
         self.subboxer.open_reconstruction(filename)
 
+    def generate_label(self):
+        return f'{self.subboxer.active_transformation_index:03d}'
 
     def _on_tomogram_close(self):
         self.subboxer.close_reconstruction()
         disable_with_opacity(self.plane_thickness_controls)
         disable_with_opacity(self.plane_volume_toggle)
 
-    def _on_render_as_volume(self):
-        self.subboxer.rendering_mode = RenderingMode.VOLUME
-        disable_with_opacity(self.plane_thickness_controls)
-
-    def _on_render_as_plane(self):
-        self.subboxer.rendering_mode = RenderingMode.PLANE
-        enable_with_opacity(self.plane_thickness_controls)
-
-    def _on_thickness_slider_changed(self):
-        self.subboxer.plane_thickness = self.plane_thickness_controls.slider.value()
-
-    def _on_plane_thickness_changed(self):
-        self.plane_thickness_controls.slider.setValue(
-            self.subboxer.plane_thickness
-        )
 
 
 @napari_hook_implementation
