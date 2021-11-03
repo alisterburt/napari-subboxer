@@ -6,13 +6,15 @@ from typing import Tuple, Optional
 
 
 class SubParticlePose(EventedModel):
-    dx: float
-    dy: float
-    dz: float
+    x: float
+    y: float
+    z: float
     x_vector: Optional[Tuple[float, float, float]] = None
     y_vector: Optional[Tuple[float, float, float]] = None
     z_vector: Optional[Tuple[float, float, float]] = None
 
-    @validator('x_vector', 'y_vector', 'z_vector')
+    @validator('x_vector', 'y_vector', 'z_vector', pre=True)
     def normalise_vector(cls, value):
-        return np.asarray(value) / np.linalg.norm(value)
+        if value is None:
+            return value
+        return tuple(np.asarray(value) / np.linalg.norm(value))

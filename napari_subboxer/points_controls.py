@@ -10,7 +10,7 @@ def add_point(
         event,
         points_layer: napari.layers.Points = None,
         plane_layer: napari.layers.Image = None,
-        point_index: Optional[int] = None,
+        append: bool = True,
         callback: Optional[Callable] = None,
 ):
     # Early exit if not alt-clicked
@@ -34,11 +34,12 @@ def add_point(
     if not point_in_bounding_box(intersection, plane_layer.extent.data):
         return
 
-    # add point
-    if point_index is not None:
-        points_layer._move(index=[point_index], coord=intersection)
-    else:
+    if append:
         points_layer.add(intersection)
+    else:
+        points_layer.data = intersection
+        # points_layer.add(intersection)
 
-    if callback:
+
+    if callback is not None:
         callback()

@@ -1,6 +1,6 @@
 from enum import auto
 from functools import partial
-from typing import Optional, Sequence, List, Dict
+from typing import Optional, Dict
 
 import mrcfile
 import napari
@@ -9,10 +9,11 @@ import numpy as np
 from napari.utils.misc import StringEnum
 from psygnal import Signal
 
+from .data_model import SubParticlePose
 from .plane_controls import shift_plane_along_normal, set_plane_normal_axis, \
     orient_plane_perpendicular_to_camera
 from .points_controls import add_point
-from .data_model import SubParticlePose
+from .layer_utils import reset_contrast_limits
 
 
 class SubboxerMode(StringEnum):
@@ -31,53 +32,66 @@ class Subboxer:
 
         self.subparticles: Dict[int, SubParticlePose] = {}
 
-        self.volume_layer: Optional[napari.layers.Image] = None
-        self.plane_layer: Optional[napari.layers.Image] = None
-        self.bounding_box_layer: Optional[napari.layers.Points] = None
-        self.subparticles_layer: Optional[napari.layers.Points] = None
-        self.current_subparticle_z_layer: Optional[napari.layers.Points] = None
+        self.volume_layer: napari.layers.Image = self.create_volume_layer()
+        self.plane_layer: napari.layers.Image = self.create_plane_layer()
+        self.bounding_box_layer: napari.layers.Points = self.create_bounding_box_layer()
+        self.subparticles_layer: napari.layers.Points = self.create_subparticles_layer()
+        self.current_subparticle_z_layer: napari.layers.Points = self.create_current_subparticle_z_layer()
 
         self.mode: SubboxerMode = SubboxerMode.ADD
         self._active_transformation_index: int = 0
         self._volume_center: Optional[int] = None
 
     @property
-    def n_transformations(self):
-        if self.subparticles_layer is None:
-            return 0
-        return len(set(self.subparticles_layer.properties['id']))
+    def n_subparticles(self):
+        return len(self.subparticle_ids)
+
+    @property
+    def subparticle_ids(self):
+        return np.sort(np.unique(self.subparticles_layer.properties['id']))
 
     @property
     def active_subparticle_id(self):
-        idx = self.subparticles_layer.selected_data
-        active_subparticle_id = self.subparticles_layer.properties['id'][idx]
-        return active_subparticle_id
+        # active subparticle is defined by selection of point in napari
+        if self.n_subparticles == 0:
+            return 0
+        idx = next(iter(self.subparticles_layer.selected_data))
+        return self.subparticles_layer.properties['id'][idx]
 
     @active_subparticle_id.setter
-    def active_subparticle_id(self, value: int):
-        if value > self.n_transformations - 1:
-            value -= self.n_transformations
-        elif value < 0:
-            value = self.n_transformations + value
-        self.subparticles_layer.selected_data = [value]
-        self._select_active_transformation()
-        self._center_camera_on_active_transformation()
+    def active_subparticle_id(self, id: int):
+        # find data index of active subparticle
+        idx = list(self.subparticles_layer.properties['id']).index(id)
+        self.subparticles_layer.selected_data = [idx]
+        self._center_camera_on_active_subparticle()
 
     @property
     def _next_subparticle_id(self):
-        return np.max(self.subparticles_layer.properties['id']) + 1
+        return np.max(self.subparticle_ids) + 1
 
     def next_subparticle(self):
-        self.active_subparticle_id += 1
+        current_idx = list(self.subparticle_ids).index(
+            self.active_subparticle_id
+        )
+        next_idx = (current_idx + 1) % self.n_subparticles
+        self.active_subparticle_id = self.subparticle_ids[next_idx]
 
     def previous_subparticle(self):
-        self.active_subparticle_id -= 1
+        current_idx = list(self.subparticle_ids).index(
+            self.active_subparticle_id
+        )
+        next_idx = (current_idx - 1) % self.n_subparticles
+        self.active_subparticle_id = self.subparticle_ids[next_idx]
 
     @property
     def _active_subparticle_center(self):
-        return self.subparticles_layer.data[self.active_subparticle_id]
+        return tuple(self.subparticles_layer.data[self.active_subparticle_id])
 
-    def _center_camera_on_active_transformation(self):
+    @property
+    def _active_subparticle_z_point(self):
+        return tuple(self.current_subparticle_z_layer.data[0])
+
+    def _center_camera_on_active_subparticle(self):
         if self.mode in (SubboxerMode.DEFINE_Z_AXIS,
                          SubboxerMode.ROTATE_IN_PLANE):
             self.viewer.camera.center = self._active_subparticle_center
@@ -98,7 +112,7 @@ class Subboxer:
         self.mode_changed.emit(str(self.mode))
 
     def _on_mode_change(self):
-        self._center_camera_on_active_transformation()
+        self._center_camera_on_active_subparticle()
 
     def activate_add_mode(self):
         self.mode = SubboxerMode.ADD
@@ -128,16 +142,20 @@ class Subboxer:
 
     def open_map(self, map_file: str):
         with mrcfile.open(map_file) as mrc:
-            tomogram = mrc.data
-        self.add_volume_layer(tomogram)
-        self.add_plane_layer(tomogram)
-        self.add_subparticles_layer()
-        self.add_current_subparticle_z_layer()
-        self.add_bounding_box_layer()
+            map = mrc.data
+        normalised_map = (map - np.mean(map)) / np.std(map)
 
-        self._volume_center = np.array(tomogram.shape) / 2
+        self.volume_layer.data = normalised_map
+        self.plane_layer.data = normalised_map
+        self._volume_center = np.array(map.shape) / 2
+        self.plane_layer.experimental_slicing_plane.position = self._volume_center
+        self.update_bounding_box()
+
+        for layer in self.volume_layer, self.plane_layer:
+            layer.visible = True
+            reset_contrast_limits(layer)
+
         self.connect_callbacks()
-
         self.viewer.reset_view()
         self.viewer.camera.angles = (140, -55, -140)
         self.viewer.camera.zoom = 0.8
@@ -148,33 +166,37 @@ class Subboxer:
         self.viewer.layers.remove(self.volume_layer)
         self.viewer.layers.remove(self.bounding_box_layer)
 
-    def add_volume_layer(self, data: np.ndarray):
-        self.volume_layer = self.viewer.add_image(
-            data=data,
+    def create_volume_layer(self):
+        volume_layer = self.viewer.add_image(
+            data=np.zeros((32, 32, 32)),
             name='map',
+            visible=False,
             colormap='gray',
             rendering='mip',
         )
+        return volume_layer
 
-    def add_plane_layer(self, reconstruction: np.ndarray):
+    def create_plane_layer(self):
         plane_parameters = {
             'enabled': True,
-            'position': np.array(reconstruction.shape) / 2,
+            'position': (0, 0, 0),
             'normal': (1, 0, 0),
             'thickness': 5,
         }
-        self.plane_layer = self.viewer.add_image(
-            data=reconstruction,
+        plane_layer = self.viewer.add_image(
+            data=np.zeros((32, 32, 32)),
             name='plane',
+            visible=False,
             colormap='magenta',
             gamma=2.0,
             rendering='mip',
             blending='additive',
             experimental_slicing_plane=plane_parameters
         )
+        return plane_layer
 
-    def add_subparticles_layer(self):
-        self.subparticles_layer = self.viewer.add_points(
+    def create_subparticles_layer(self):
+        subparticles_layer = self.viewer.add_points(
             name='subparticles',
             data=[0, 0, 0],  # adding point to initialise properties correctly
             properties={'id': [0]},
@@ -183,18 +205,33 @@ class Subboxer:
             n_dimensional=True
         )
         # remove fake point, properties are preserved
-        self.subparticles_layer.selected_data = [0]
-        self.subparticles_layer.remove_selected()
+        subparticles_layer.selected_data = [0]
+        subparticles_layer.remove_selected()
 
-    def add_current_subparticle_z_layer(self):
-        self.current_subparticle_z_layer = self.viewer.add_points(
+        return subparticles_layer
+
+    def create_current_subparticle_z_layer(self):
+        current_subparticle_z_layer = self.viewer.add_points(
             name='current subparticle z',
             ndim=3,
             face_color='green',
             n_dimensional=True
         )
+        return current_subparticle_z_layer
 
-    def add_bounding_box_layer(self):
+    def create_bounding_box_layer(self):
+        bounding_box_layer = self.viewer.add_points(
+            name='bounding box',
+            ndim=3,
+            blending='opaque',
+            face_color='cornflowerblue',
+            edge_color='black',
+            edge_width=2,
+            size=10,
+        )
+        return bounding_box_layer
+
+    def update_bounding_box(self):
         bounding_box_max = self.volume_layer.data.shape
         bounding_box_points = np.array(
             [
@@ -208,15 +245,7 @@ class Subboxer:
                 [bounding_box_max[0], bounding_box_max[1], bounding_box_max[2]]
             ]
         )
-        self.bounding_box_layer = self.viewer.add_points(
-            data=bounding_box_points,
-            name='bounding box',
-            blending='opaque',
-            face_color='cornflowerblue',
-            edge_color='black',
-            edge_width=2,
-            size=10,
-        )
+        self.bounding_box_layer.data = bounding_box_points
 
     def if_add_mode_enabled(self, func):
         def inner(*args, **kwargs):
@@ -240,17 +269,19 @@ class Subboxer:
         return inner
 
     def _on_add_subparticle_center(self):
-        current_subparticle_id = int(self.active_subparticle_id)
-
-        # update id for next particle
-        self.subparticles_layer.current_properties['id'] += 1
+        # update id to be assigned to next particle
+        self.subparticles_layer.current_properties['id'] = self._next_subparticle_id
 
         # create subparticle and add to dict of subparticles
-        shifts = self._active_subparticle_center - self._volume_center
-        subparticle = SubParticlePose(
-            dx=shifts[-1], dy=shifts[-2], dz=shifts[0]
-        )
-        self.subparticles[current_subparticle_id] = subparticle
+        z, y, x = self._active_subparticle_center
+        subparticle = SubParticlePose(x=x, y=y, z=z)
+        self.subparticles[self.active_subparticle_id] = subparticle
+
+    def _on_add_subparticle_z(self):
+        start = np.asarray(self._active_subparticle_center)
+        end = np.asarray(self._active_subparticle_z_point)
+        z_vector = end - start
+        self.subparticles[self.active_subparticle_id].z_vector = z_vector
 
     def connect_callbacks(self):
         # plane click and drag
@@ -296,6 +327,7 @@ class Subboxer:
             self.if_add_mode_enabled(add_point),
             points_layer=self.subparticles_layer,
             plane_layer=self.plane_layer,
+            append=True,
             callback=self._on_add_subparticle_center,
         )
         self.viewer.mouse_drag_callbacks.append(
@@ -307,6 +339,8 @@ class Subboxer:
             self.if_define_z_mode_enabled(add_point),
             points_layer=self.current_subparticle_z_layer,
             plane_layer=self.plane_layer,
+            append=False,
+            callback=self._on_add_subparticle_z
         )
         self.viewer.mouse_drag_callbacks.append(
             self._define_z_axis_callback
