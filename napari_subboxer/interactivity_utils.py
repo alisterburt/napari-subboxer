@@ -80,3 +80,51 @@ def point_in_layer_bounding_box(point, layer):
         return True
 
 
+def rotation_matrices_to_align_vectors(a: np.ndarray, b: np.ndarray):
+    """
+    Find rotation matrices r such that r @ a = b
+
+    Implementation designed to avoid trig calls, a and b must be normalised.
+    based on https://iquilezles.org/www/articles/noacos/noacos.htm
+
+    Parameters
+    ----------
+    a : np.ndarray
+        (1 or n, 3) normalised vector(s) of length 3.
+    b : np.ndarray
+        (1 or n, 3) normalised vector(s) of length 3.
+
+    Returns
+    -------
+    r : np.ndarray
+        (3, 3) rotation matrix or (n, 3, 3) array thereof.
+    """
+    # setup
+    a = a.reshape(-1, 3)
+    b = b.reshape(-1, 3)
+    n_vectors = a.shape[0]
+
+    # cross product to find axis about which rotation should occur
+    axis = np.cross(a, b, axis=1)
+    # dot product equals cosine of angle between normalised vectors
+    cos_angle = np.einsum('ij, ij -> i', a, b)
+    # k is a constant which appears as a factor in the rotation matrix
+    k = 1 / (1 + cos_angle)
+
+    # construct rotation matrix
+    r = np.empty((n_vectors, 3, 3))
+    r[:, 0, 0] = (axis[:, 0] * axis[:, 0] * k) + cos_angle
+    r[:, 0, 1] = (axis[:, 1] * axis[:, 0] * k) - axis[:, 2]
+    r[:, 0, 2] = (axis[:, 2] * axis[:, 0] * k) + axis[:, 1]
+    r[:, 1, 0] = (axis[:, 0] * axis[:, 1] * k) + axis[:, 2]
+    r[:, 1, 1] = (axis[:, 1] * axis[:, 1] * k) + cos_angle
+    r[:, 1, 2] = (axis[:, 2] * axis[:, 1] * k) - axis[:, 0]
+    r[:, 2, 0] = (axis[:, 0] * axis[:, 2] * k) - axis[:, 1]
+    r[:, 2, 1] = (axis[:, 1] * axis[:, 2] * k) + axis[:, 0]
+    r[:, 2, 2] = (axis[:, 2] * axis[:, 2] * k) + cos_angle
+
+    return r.squeeze()
+
+
+def rotation_matrix_from_z_vector(z_vector: np.ndarray):
+    return rotation_matrices_to_align_vectors(np.array([0, 0, 1]), z_vector)

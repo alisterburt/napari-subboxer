@@ -27,6 +27,6 @@ def napari_tomoslice(tomogram_file: Path = typer.Argument(
         plugin_name='napari-subboxer'
     )
     if tomogram_file is not None:
-        tomoslice_widget.subboxer.open_reconstruction(tomogram_file)
+        tomoslice_widget.subboxer.open_map(tomogram_file)
         tomoslice_widget.update_widget_visibility(tomogram_opened=True)
     napari.run()

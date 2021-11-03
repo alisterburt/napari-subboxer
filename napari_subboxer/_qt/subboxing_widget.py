@@ -26,8 +26,8 @@ class SubboxingWidget(QWidget):
         )
         self.active_transformation_controls = LabelBetweenArrows(
             label_func=self.generate_label,
-            decrease_callback=self.subboxer.previous_transformation,
-            increase_callback=self.subboxer.next_transformation,
+            decrease_callback=self.subboxer.previous_subparticle,
+            increase_callback=self.subboxer.next_subparticle,
         )
         self.mode_controls = LabeledSelectableButtonList(
             label='mode:',
@@ -60,13 +60,13 @@ class SubboxingWidget(QWidget):
         )
         if filename == '':  # no file selected, early exit
             return
-        self.subboxer.open_reconstruction(filename)
+        self.subboxer.open_map(filename)
 
     def generate_label(self):
-        return f'{self.subboxer.active_transformation_index:03d}'
+        return f'{self.subboxer.active_subparticle_id:03d}'
 
     def _on_tomogram_close(self):
-        self.subboxer.close_reconstruction()
+        self.subboxer.close_map()
         disable_with_opacity(self.plane_thickness_controls)
         disable_with_opacity(self.plane_volume_toggle)
 

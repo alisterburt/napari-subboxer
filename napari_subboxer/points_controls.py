@@ -1,3 +1,5 @@
+from typing import Callable, Optional
+
 import napari.layers
 
 from .interactivity_utils import point_in_bounding_box
@@ -7,7 +9,9 @@ def add_point(
         viewer,
         event,
         points_layer: napari.layers.Points = None,
-        plane_layer: napari.layers.Image = None
+        plane_layer: napari.layers.Image = None,
+        point_index: Optional[int] = None,
+        callback: Optional[Callable] = None,
 ):
     # Early exit if not alt-clicked
     if 'Alt' not in event.modifiers:
@@ -31,5 +35,10 @@ def add_point(
         return
 
     # add point
-    points_layer.add(intersection)
+    if point_index is not None:
+        points_layer._move(index=[point_index], coord=intersection)
+    else:
+        points_layer.add(intersection)
 
+    if callback:
+        callback()
