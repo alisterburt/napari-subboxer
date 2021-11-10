@@ -46,7 +46,9 @@ class SubboxingWidget(QWidget):
         self.layout().setContentsMargins(8, 2, 2, 2)
         self.layout().addStretch(1)
 
-        # self.setFixedHeight(90)
+        self.subboxer.active_subparticle_changed.connect(
+            self._on_active_subparticle_changed
+        )
 
     def _on_tomogram_open(self):
         options = QFileDialog.Options()
@@ -62,13 +64,17 @@ class SubboxingWidget(QWidget):
             return
         self.subboxer.open_map(filename)
 
-    def generate_label(self):
-        return f'{self.subboxer.active_subparticle_id:03d}'
-
     def _on_tomogram_close(self):
         self.subboxer.close_map()
         disable_with_opacity(self.plane_thickness_controls)
         disable_with_opacity(self.plane_volume_toggle)
+
+    def generate_label(self):
+        return f'{self.subboxer.active_subparticle_id:03d}'
+
+    def _on_active_subparticle_changed(self, id: int = None):
+        self.active_transformation_controls.update_label()
+
 
 
 

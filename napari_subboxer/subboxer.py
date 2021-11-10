@@ -25,6 +25,7 @@ class SubboxerMode(StringEnum):
 class Subboxer:
     plane_thickness_changed = Signal(float)
     mode_changed = Signal(str)
+    active_subparticle_changed = Signal(int)
 
     def __init__(self, viewer: napari.Viewer):
         self.viewer = viewer
@@ -63,20 +64,21 @@ class Subboxer:
         # find data index of active subparticle
         idx = list(self.subparticles_layer.properties['id']).index(id)
         self.subparticles_layer.selected_data = [idx]
-        self._center_camera_on_active_subparticle()
+        self.active_subparticle_changed.emit(id)
+        self._on_active_subparticle_change()
 
     @property
     def _next_subparticle_id(self):
         return np.max(self.subparticle_ids) + 1
 
-    def next_subparticle(self):
+    def next_subparticle(self, event=None):
         current_idx = list(self.subparticle_ids).index(
             self.active_subparticle_id
         )
         next_idx = (current_idx + 1) % self.n_subparticles
         self.active_subparticle_id = self.subparticle_ids[next_idx]
 
-    def previous_subparticle(self):
+    def previous_subparticle(self, event=None):
         current_idx = list(self.subparticle_ids).index(
             self.active_subparticle_id
         )
@@ -91,13 +93,14 @@ class Subboxer:
     def _active_subparticle_z_point(self):
         return tuple(self.current_subparticle_z_layer.data[0])
 
-    def _center_camera_on_active_subparticle(self):
+    def _on_active_subparticle_change(self):
         if self.mode in (SubboxerMode.DEFINE_Z_AXIS,
                          SubboxerMode.ROTATE_IN_PLANE):
             self.viewer.camera.center = self._active_subparticle_center
             self.viewer.camera.zoom = 3
+        self.current_subparticle_z_layer.visible = False
 
-    def _select_active_transformation(self):
+    def _select_active_transformation_in_viewer(self):
         self.subparticles_layer.selected_data = [
             self.active_subparticle_id
         ]
@@ -112,16 +115,19 @@ class Subboxer:
         self.mode_changed.emit(str(self.mode))
 
     def _on_mode_change(self):
-        self._center_camera_on_active_subparticle()
+        self._on_active_subparticle_change()
 
     def activate_add_mode(self):
         self.mode = SubboxerMode.ADD
+        self.viewer.camera.center = self._volume_center
 
     def activate_define_z_mode(self):
         self.mode = SubboxerMode.DEFINE_Z_AXIS
+        self._on_active_subparticle_change()
 
     def activate_rotate_in_plane_mode(self):
         self.mode = SubboxerMode.ROTATE_IN_PLANE
+        self._on_active_subparticle_change()
 
     @property
     def plane_thickness(self):
@@ -276,12 +282,15 @@ class Subboxer:
         z, y, x = self._active_subparticle_center
         subparticle = SubParticlePose(x=x, y=y, z=z)
         self.subparticles[self.active_subparticle_id] = subparticle
+        self.active_subparticle_changed.emit(self.active_subparticle_id)
 
     def _on_add_subparticle_z(self):
         start = np.asarray(self._active_subparticle_center)
         end = np.asarray(self._active_subparticle_z_point)
         z_vector = end - start
         self.subparticles[self.active_subparticle_id].z_vector = z_vector
+        self.current_subparticle_z_layer.visible = True
+        print(z_vector)
 
     def connect_callbacks(self):
         # plane click and drag
@@ -345,6 +354,10 @@ class Subboxer:
         self.viewer.mouse_drag_callbacks.append(
             self._define_z_axis_callback
         )
+
+        # left right to navigate subparticles
+        self.viewer.bind_key('Left', self.previous_subparticle)
+        self.viewer.bind_key('Right', self.next_subparticle)
 
     def disconnect_callbacks(self):
         self.viewer.mouse_drag_callbacks.remove(self._shift_plane_callback)
