@@ -14,6 +14,7 @@ from .layer_utils import reset_contrast_limits
 from .plane_controls import shift_plane_along_normal, set_plane_normal_axis, \
     orient_plane_perpendicular_to_camera
 from .points_controls import add_point
+from .oriented_points_controls import update_in_plane_rotation
 
 
 class SubboxerMode(StringEnum):
@@ -276,7 +277,7 @@ class Subboxer:
 
     def if_in_plane_mode_enabled(self, func):
         def inner(*args, **kwargs):
-            if self.mode == SubboxerMode.DEFINE_Z_AXIS:
+            if self.mode == SubboxerMode.ROTATE_IN_PLANE:
                 return func(*args, **kwargs)
 
         return inner
@@ -367,6 +368,14 @@ class Subboxer:
         # left right to navigate subparticles
         self.viewer.bind_key('Left', self.previous_subparticle)
         self.viewer.bind_key('Right', self.next_subparticle)
+
+        # rotate in plane callback
+        self._rotate_in_plane_callback = partial(
+            self.if_in_plane_mode_enabled(update_in_plane_rotation)
+        )
+        self.viewer.mouse_drag_callbacks.append(
+            self._rotate_in_plane_callback
+        )
 
     def disconnect_callbacks(self):
         self.viewer.mouse_drag_callbacks.remove(self._shift_plane_callback)

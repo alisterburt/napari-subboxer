@@ -76,8 +76,6 @@ class SubboxingWidget(QWidget):
         self.active_transformation_controls.update_label()
 
 
-
-
 @napari_hook_implementation
 def napari_experimental_provide_dock_widget():
     widget_options = {
