@@ -81,7 +81,7 @@ class SubboxingWidget(QWidget):
 @napari_hook_implementation
 def napari_experimental_provide_dock_widget():
     widget_options = {
-        "name": "subboxing widget",
+        "name": "subboxer",
         "add_vertical_stretch": False,
         "area": 'left',
     }
