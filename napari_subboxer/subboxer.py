@@ -1,5 +1,5 @@
 from enum import auto
-from functools import partial
+from functools import partial, reduce
 from typing import Optional, Dict
 
 import mrcfile
@@ -11,10 +11,10 @@ from psygnal import Signal
 
 from .data_model import SubParticlePose
 from .layer_utils import reset_contrast_limits
+from .oriented_points_controls import update_in_plane_rotation
 from .plane_controls import shift_plane_along_normal, set_plane_normal_axis, \
     orient_plane_perpendicular_to_camera
 from .points_controls import add_point
-from .oriented_points_controls import update_in_plane_rotation
 
 
 class SubboxerMode(StringEnum):
@@ -75,6 +75,10 @@ class Subboxer:
         self._on_active_subparticle_change()
 
     @property
+    def active_subparticle(self):
+        return self.subparticles[self.active_subparticle_id]
+
+    @property
     def _next_subparticle_id(self):
         return np.max(self.subparticle_ids) + 1
 
@@ -104,7 +108,7 @@ class Subboxer:
         if self.mode in (SubboxerMode.DEFINE_Z_AXIS,
                          SubboxerMode.ROTATE_IN_PLANE):
             self.viewer.camera.center = self._active_subparticle_center
-            self.viewer.camera.zoom = 3
+            self.viewer.camera.zoom = 5
         self.current_subparticle_z_layer.visible = False
 
     def _select_active_transformation_in_viewer(self):
@@ -275,7 +279,7 @@ class Subboxer:
 
         return inner
 
-    def if_in_plane_mode_enabled(self, func):
+    def if_rotate_in_plane_mode_enabled(self, func):
         def inner(*args, **kwargs):
             if self.mode == SubboxerMode.ROTATE_IN_PLANE:
                 return func(*args, **kwargs)
@@ -371,8 +375,11 @@ class Subboxer:
 
         # rotate in plane callback
         self._rotate_in_plane_callback = partial(
-            self.if_in_plane_mode_enabled(update_in_plane_rotation)
+            self.if_rotate_in_plane_mode_enabled(update_in_plane_rotation),
+            subboxer=self,
+            callback=self.populate_subparticle_vectors_layers
         )
+
         self.viewer.mouse_drag_callbacks.append(
             self._rotate_in_plane_callback
         )
@@ -387,7 +394,7 @@ class Subboxer:
     def create_subparticle_z_vectors_layer(self):
         z_vectors_layer = self.viewer.add_vectors(
             data=np.zeros(6).reshape((1, 2, 3)),
-            length=12,
+            length=18,
             name='subparticle z vectors',
             edge_color='blue',
             edge_width=3
@@ -398,7 +405,7 @@ class Subboxer:
         y_vectors_layer = self.viewer.add_vectors(
             data=np.zeros(6).reshape((1, 2, 3)),
             ndim=3,
-            length=8,
+            length=12,
             name='subparticle y vectors',
             edge_color='orange',
             edge_width=3
@@ -409,7 +416,7 @@ class Subboxer:
         x_vectors_layer = self.viewer.add_vectors(
             data=np.zeros(6).reshape((1, 2, 3)),
             ndim=3,
-            length=4,
+            length=8,
             name='subparticle x vectors',
             edge_color='green',
             edge_width=3
@@ -417,27 +424,18 @@ class Subboxer:
         return x_vectors_layer
 
     def populate_subparticle_vectors_layers(self):
-        vectors_data = [subparticle.as_vectors_data()
-                        for subparticle in
-                        self.subparticles.values()]
-        z_vectors = np.stack([
-            xyz[2]
-            for xyz in vectors_data
-            if xyz[2] is not None
-        ], axis=0)
-        print(z_vectors)
-        # # y_vectors = np.stack([
-        # #     xyz[1]
-        # #     for xyz in vectors_data
-        # #     if xyz[1] is not None
-        # # ], axis=0)
-        # # x_vectors = np.stack([
-        # #     xyz[0]
-        # #     for xyz in vectors_data
-        # #     if xyz[0] is not None
-        # # ], axis=0)
-        # # print(z_vectors)
-        self.subparticle_z_vectors_layer.data = z_vectors
-        # # self.subparticle_y_vectors_layer.data = y_vectors
-        # # self.subparticle_x_vectors_layer.data = x_vectors
-        # pass
+        vectors_data_attributes = [f'{ax}_vector_napari' for ax in 'xyz']
+        vectors_layers = (
+            self.subparticle_x_vectors_layer,
+            self.subparticle_y_vectors_layer,
+            self.subparticle_z_vectors_layer
+        )
+        for attr, layer in zip(vectors_data_attributes, vectors_layers):
+            vector_data = [
+                getattr(subparticle, attr)
+                for subparticle in self.subparticles.values()
+                if getattr(subparticle, attr) is not None
+            ]
+            if len(vector_data) > 0:
+                layer.data = np.stack(vector_data, axis=0)
+

@@ -128,3 +128,20 @@ def rotation_matrices_to_align_vectors(a: np.ndarray, b: np.ndarray):
 
 def rotation_matrix_from_z_vector(z_vector: np.ndarray):
     return rotation_matrices_to_align_vectors(np.array([0, 0, 1]), z_vector)
+
+
+def theta2rotz(theta: np.ndarray) -> np.ndarray:
+    """
+    Rz = [[c(t), -s(t), 0],
+          [s(t),  c(t), 0],
+          [   0,     0, 1]]
+    """
+    theta = np.deg2rad(np.asarray(theta).reshape(-1))
+    rotation_matrices = np.zeros((theta.shape[0], 3, 3), dtype=float)
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    rotation_matrices[:, 2, 2] = 1
+    rotation_matrices[:, (0, 1), (0, 1)] = cos_theta[:, np.newaxis]
+    rotation_matrices[:, 0, 1] = -sin_theta
+    rotation_matrices[:, 1, 0] = sin_theta
+    return rotation_matrices.squeeze()
