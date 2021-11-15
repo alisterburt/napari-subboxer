@@ -132,14 +132,17 @@ class Subboxer:
         self.mode = SubboxerMode.ADD
         self.viewer.camera.center = self._volume_center
         self.current_subparticle_z_layer.visble = False
+        self.plane_layer.visible = True
 
     def activate_define_z_mode(self):
         self.mode = SubboxerMode.DEFINE_Z_AXIS
         self._on_active_subparticle_change()
+        self.plane_layer.visible = True
 
     def activate_rotate_in_plane_mode(self):
         self.mode = SubboxerMode.ROTATE_IN_PLANE
         self._on_active_subparticle_change()
+        self.plane_layer.visble = False
 
     @property
     def plane_thickness(self):
