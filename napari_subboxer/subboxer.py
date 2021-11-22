@@ -8,6 +8,9 @@ import napari.layers
 import numpy as np
 from napari.utils.misc import StringEnum
 from psygnal import Signal
+import eulerangles
+import pandas as pd
+import starfile
 
 from .data_model import SubParticlePose
 from .layer_utils import reset_contrast_limits
@@ -135,15 +138,15 @@ class Subboxer:
     def activate_add_mode(self):
         self.mode = SubboxerMode.ADD
         self.viewer.camera.center = self._volume_center
-        self.current_subparticle_z_layer.visble = False
+        self._on_mode_change()
 
     def activate_define_z_mode(self):
         self.mode = SubboxerMode.DEFINE_Z_AXIS
-        self.plane_layer.visible = True
+        self._on_mode_change()
 
     def activate_rotate_in_plane_mode(self):
         self.mode = SubboxerMode.ROTATE_IN_PLANE
-        self._on_active_subparticle_change()
+        self._on_mode_change()
 
     @property
     def plane_thickness(self):
@@ -409,7 +412,7 @@ class Subboxer:
         y_vectors_layer = self.viewer.add_vectors(
             data=np.zeros(6).reshape((1, 2, 3)),
             ndim=3,
-            length=12,
+            length=8,
             name='subparticle y vectors',
             edge_color='orange',
             edge_width=3
@@ -442,4 +445,44 @@ class Subboxer:
             ]
             if len(vector_data) > 0:
                 layer.data = np.stack(vector_data, axis=0)
+
+    def save_subparticles(self, output_filename):
+        shifts = []
+        eulers = []
+        for subparticle in self.subparticles.values():
+            dx = subparticle.x - self._volume_center[2]
+            dy = subparticle.y - self._volume_center[1]
+            dz = subparticle.z - self._volume_center[0]
+            subparticle_shifts = np.array([dx, dy, dz])
+            shifts.append(subparticle_shifts)
+
+            orientation = np.column_stack(
+                (
+                    subparticle.x_vector,
+                    subparticle.y_vector,
+                    subparticle.z_vector
+                )
+            )
+            subparticle_eulers = eulerangles.matrix2euler(
+                orientation.swapaxes(-1, -2),
+                axes='zyz',
+                intrinsic=True,
+                right_handed_rotation=True
+            )
+            eulers.append(subparticle_eulers)
+
+        data = {
+            'subboxerShiftX': np.array([shift[0] for shift in shifts]),
+            'subboxerShiftY': np.array([shift[1] for shift in shifts]),
+            'subboxerShiftZ': np.array([shift[2] for shift in shifts]),
+            'subboxerAngleRot': np.array(triplet[0] for triplet in eulers),
+            'subboxerAngleTilt': np.array(triplet[1] for triplet in eulers),
+            'subboxerAnglePsi': np.array(triplet[2] for triplet in eulers),
+        }
+        df = pd.DataFrame.from_dict(data)
+        starfile.write(df, output_filename, force_loop=True, overwrite=True)
+
+
+
+
 

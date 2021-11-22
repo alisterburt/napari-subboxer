@@ -2,7 +2,7 @@ from functools import partial
 
 import napari.viewer
 from napari_plugin_engine import napari_hook_implementation
-from qtpy.QtWidgets import QWidget, QVBoxLayout, QFileDialog
+from qtpy.QtWidgets import QWidget, QVBoxLayout, QFileDialog, QPushButton
 
 
 from .open_close_buttons import OpenCloseButtonsWidget
@@ -37,17 +37,26 @@ class SubboxingWidget(QWidget):
                 ('in plane', self.subboxer.activate_rotate_in_plane_mode)
             ]
         )
+        self.save_transformations_button = QPushButton('save transformations')
 
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(self.open_close_buttons)
         self.layout().addWidget(self.mode_controls)
         self.layout().addWidget(self.active_transformation_controls)
+        self.layout().addWidget(self.save_transformations_button)
         self.layout().setSpacing(0)
         self.layout().setContentsMargins(8, 2, 2, 2)
         self.layout().addStretch(1)
 
+        self.mode_controls.setStyleSheet(
+            "QPushButton{font-size: 10px;}"
+        )
+
         self.subboxer.active_subparticle_changed.connect(
             self._on_active_subparticle_changed
+        )
+        self.save_transformations_button.clicked.connect(
+            self._on_save_subparticles
         )
 
     def _on_tomogram_open(self):
@@ -68,6 +77,20 @@ class SubboxingWidget(QWidget):
         self.subboxer.close_map()
         disable_with_opacity(self.plane_thickness_controls)
         disable_with_opacity(self.plane_volume_toggle)
+
+    def _on_save_subparticles(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save file...",
+            f"subparticle_transformations.star",
+            "subboxer transformations (*.star)",
+            options=options
+        )
+        if filename == '':  # no file selected, early exit
+            return
+        self.subboxer.save_subparticles(output_filename=filename)
 
     def generate_label(self):
         return f'{self.subboxer.active_subparticle_id:03d}'
