@@ -6,7 +6,12 @@
 [![tests](https://github.com/alisterburt/napari-subboxer/workflows/tests/badge.svg)](https://github.com/alisterburt/napari-subboxer/actions)
 [![codecov](https://codecov.io/gh/alisterburt/napari-subboxer/branch/master/graph/badge.svg)](https://codecov.io/gh/alisterburt/napari-subboxer)
 
-A napari plugin for visualising and interacting with electron cryotomograms.
+A napari plugin to define [subboxing transformations] and a CLI tool to apply them.
+
+The plugin is under active development, unstable and provided with no guarantees.
+If you would like to use it, please get in touch!
+
+![subboxer demo](https://user-images.githubusercontent.com/7307488/143312042-770a4ed2-7519-4114-9119-2323196aadfd.gif)
 
 
 ## Installation
@@ -15,31 +20,30 @@ You can install `napari-subboxer` via [pip]:
 
     pip install napari-subboxer
 
+It is recommended to install `napari-subboxer` into a clean virtual environment.
+
 ## Usage
 
-This plugin provides a user interface for opening electron cryotomograms in 
-napari as both volumes and slices through volumes.
+The expected workflow for using this plugin and further refinement is 
+1. define and save subboxing transformations using `napari-subboxer define`
+2. apply transformations using `napari-subboxer apply`
+3. re-reconstruct/extract your particle set with the new set of poses
+4. reconstruct your particles to create a new reference centered on your subparticle
+5. refine refine refine!
 
-![demo](https://user-images.githubusercontent.com/7307488/138575305-b05c4735-9c03-4629-bfb0-9612ea8f26fd.gif)
+`napari-subboxer define` define has three modes, activated via buttons in the GUI
+- add new point
+- define z-axis of each point
+- define in plane orientation of each point
 
-The plugin can be opened from the `plugins` menu in napari, or with 
-`napari-subboxer` at the command line.
+In add or define-z mode alt-click on the plane to add a new point.
+In in-plane mode alt-click and drag to set the in plane orientation of the current point
 
-![plugins-menu](https://user-images.githubusercontent.com/7307488/138575015-00ea78d9-02c1-44bc-9034-0c0a7fa8d973.png)
+The plane can be moved by clicking and dragging. 
+The plane can be reoriented with the x/y/z/o keys 
+(o sets the plane normal to the camera view direction).
 
-```yaml
-Usage: napari-subboxer [TOMOGRAM_FILE]
-
-  An interactive tool for defining and applying relative transforms
-  on sets of particles in napari.
-
-Arguments:
-  [TOMOGRAM_FILE]
-
-Options:
-  --help                          Show this message and exit.
-
-```
+Subboxing transformations can currently only be applied on RELION 3.1 star files.
 
 ## Contributing
 
