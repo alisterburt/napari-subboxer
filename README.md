@@ -9,7 +9,7 @@
 A napari plugin to define [subboxing transformations] and a CLI tool to apply them.
 
 The plugin is under active development, unstable and provided with no guarantees.
-If you would like to use it, please get in touch!
+If you would like to use it and require help, please get in touch!
 
 ![subboxer demo](https://user-images.githubusercontent.com/7307488/143312042-770a4ed2-7519-4114-9119-2323196aadfd.gif)
 
