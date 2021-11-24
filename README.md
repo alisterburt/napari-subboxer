@@ -6,7 +6,7 @@
 [![tests](https://github.com/alisterburt/napari-subboxer/workflows/tests/badge.svg)](https://github.com/alisterburt/napari-subboxer/actions)
 [![codecov](https://codecov.io/gh/alisterburt/napari-subboxer/branch/master/graph/badge.svg)](https://codecov.io/gh/alisterburt/napari-subboxer)
 
-A napari plugin to define [subboxing transformations] and a CLI tool to apply them.
+A napari plugin to define [subboxing transformations](https://teamtomo.org/theory/subtomogram-averaging/particle-picking/subboxing.html) and a CLI tool to apply them.
 
 The plugin is under active development, unstable and provided with no guarantees.
 If you would like to use it and require help, please get in touch!
